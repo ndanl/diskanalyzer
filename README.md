@@ -11,8 +11,9 @@ $ python diskanalyzer.py -p [profile name]
 $ AWS_DEFAULT_PROFILE=default python diskanalyzer.py
 
 For more information about options:
-
+```
 $ python diskanalyzer.py --help
+
 diskanalyzer.py <options>
 	Options are:
 
@@ -30,3 +31,4 @@ diskanalyzer.py <options>
 		3. A valid AWS_DEFAULT_PROFILE enviornment variable.
 
 	Depending on the number of EBS volumes being analyzed, this tool make take several minutes to run.
+```
