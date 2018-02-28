@@ -1,3 +1,21 @@
+#----------------------------------------------------------------------------
+# Copyright 2018, FittedCloud, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+#Unless required by applicable law or agreed to in writing, software
+#distributed under the License is distributed on an "AS IS" BASIS,
+#WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#See the License for the specific language governing permissions and
+#limitations under the License.
+#
+#Author: Gregory Fedynyshyn (greg@fittedcloud.com)
+#----------------------------------------------------------------------------
+
 import sys
 import os
 import re
@@ -67,6 +85,7 @@ def ssm_send_command_individual(boto_session, ec2Id, command, platform=""):
         return None
 
 
+# not currently used
 # use ssm_send_command_individual isntead
 def ssm_send_command(boto_session, ec2id_list, command):
     try:
@@ -91,12 +110,6 @@ def ssm_send_command(boto_session, ec2id_list, command):
     return output['Command']['CommandId']
 
 
-# small wrapper function to keep ssm_send_command general, but to enforce
-def send_df_command(boto_session, ec2idList):
-    command = "df --block-size=%s" %(BLOCK_SIZE)
-    return ssm_send_command(boto_session, ec2idList, command)
-
-
 # cmd_list should be single CommandInfo
 def ssm_get_command_results(boto_session, cmd_info):
     output = None
@@ -112,6 +125,7 @@ def ssm_get_command_results(boto_session, cmd_info):
     return output
 
 
+# not currently used
 # cmd_list should be list of CommandInfo's
 def ssm_get_command_results_all(boto_session, cmd_info_list):
     output = None
@@ -125,12 +139,10 @@ def ssm_get_command_results_all(boto_session, cmd_info_list):
             e = sys.exc_info()
             print("ERROR failed to get command results %s" %str(e))
             traceback.print_exc()
-    #print(str(output))
-    #print("StandardOutputContent:\n%s" %str(output['StandardOutputContent']))
-    #print("ssm_get_command_results output = \n%s" %(str(output)))
     return output
 
 
+# not currently used
 # can set cmdId to get a single command id, which should return results
 # for each instance to which the command was sent.
 def ssm_get_command_invocations_by_cmdId(boto_session, cmdId):
@@ -150,6 +162,7 @@ def ssm_get_command_invocations_by_cmdId(boto_session, cmdId):
         return []
 
 
+# not currently used
 # get results per instances.  useful when you want to get historical results.
 def ssm_get_command_invocations_by_ec2Id(boto_session):
     try:
@@ -163,7 +176,6 @@ def ssm_get_command_invocations_by_ec2Id(boto_session):
             for cmd in output['CommandInvocations']:
                 if cmd['Status'] == "Success" and \
                    cmd['Comment'] == "fc_diskanalyzer":
-                    #tmp = CommandInfo(ec2Id=cmd['InstanceId'], cmdId=cmd['CommandInfo'])
                     tmp = CommandInfo(ec2Id=ec2.id, cmdId=cmd['CommandId'])
                     cmd_list.append(tmp)
         return cmd_list
@@ -233,6 +245,8 @@ def parse_wmic_output(out):
 
 
 # human readable can be blank for bytes, 'k' for KB, 'm' for MB, 'g' for GB
+# dump json raw, not human-readable.  consumer of can apply transformations
+# to json output.
 def print_results(df_list, human_readable='', j=False):
     if j == True:
         print(json.dumps(df_list, sort_keys=True, indent=4))
@@ -357,7 +371,7 @@ if __name__ == "__main__":
                     print("\nError: invalid profile: %s" %p)
                     os._exit(1)
 
-            # get secret access key
+            # get secret/access keys
             a = pFile.readline().strip().split(" ")[2]
             s = pFile.readline().strip().split(" ")[2]
 
@@ -382,15 +396,17 @@ if __name__ == "__main__":
             cmd_info_list = []
             i = 0
             for ec2 in ec2_all:
-                # ec2.platform is empty if Linux
+                # ec2.platform is empty if Linux.  boto3 docs say that
+                # the W in Windows should be upper-case, but it's wrong.
                 if ec2.platform == "windows":
                     cmdId = ssm_send_command_individual(bs, ec2.id,
                         "wmic logicaldisk get caption,deviceid,freespace,size", "windows")
                 else:
-                    cmdId = ssm_send_command_individual(bs, ec2.id, "df")
+                    df = "df --block-size=%d" %DF_BLOCK_SIZE
+                    cmdId = ssm_send_command_individual(bs, ec2.id, df)
                 if (cmdId == None): # error
                     continue # skip if SSM Agent not installed
-                    #print("ERROR: failed to send command to EC2 %s.  Perhaps SSM Agent is not installed." %ec2.id)
+                    #print("ERROR: failed to send command to EC2 %s.  Perhaps SSM Agent is not installed." %ec2.id) # common error
                 else:
                     cmd_info = CommandInfo(ec2Id=ec2.id, cmdId=cmdId, platform=ec2.platform)
                     cmd_info_list.append(cmd_info)
