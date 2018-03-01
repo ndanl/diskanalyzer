@@ -41,19 +41,21 @@ CommandInfo = namedtuple("CommandInfo", "ec2Id, cmdId, platform")
 # purposes of this script, hardcoding is fine.
 aws_regions = [
     'us-east-1',       # US East (N. Virginia)
-    'us-west-2',       # US West (Oregon)
-    'us-west-1',       # US West (N. California)
-    'eu-west-1',       # EU (Ireland)
-    'eu-central-1',    # EU (Frankfurt)
-    'ap-southeast-1',  # Asia Pacific (Singapore)
-    'ap-northeast-1',  # Asia Pacific (Tokyo)
-    'ap-southeast-2',  # Asia Pacific (Sydney)
-    'ap-northeast-2',  # Asia Pacific (Seoul)
-    'sa-east-1',       # South America (Sao Paulo)
     'us-east-2',       # US East (Ohio)
-    'ap-south-1',      # Asia Pacific (Mumbai)
+    'us-west-1',       # US West (N. California)
+    'us-west-2',       # US West (Oregon)
     'ca-central-1',    # Canada (Central)
+    'eu-central-1',    # EU (Frankfurt)
+    'eu-west-1',       # EU (Ireland)
     'eu-west-2',       # EU (London)
+    'eu-west-3',       # EU (Paris)
+    'ap-northeast-1',  # Asia Pacific (Tokyo)
+    'ap-northeast-2',  # Asia Pacific (Seoul)
+    'ap-northeast-3',  # Asia Pacific (Osaka-Local)
+    'ap-southeast-1',  # Asia Pacific (Singapore)
+    'ap-southeast-2',  # Asia Pacific (Sydney)
+    'ap-south-1',      # Asia Pacific (Mumbai)
+    'sa-east-1',       # South America (Sao Paulo)
 ]
 
 # if we send a bulk command out, and one or more instances in the list
@@ -85,39 +87,13 @@ def ssm_send_command_individual(boto_session, ec2Id, command, platform=""):
         return None
 
 
-# not currently used
-# use ssm_send_command_individual isntead
-def ssm_send_command(boto_session, ec2id_list, command):
-    try:
-        output = boto_session.client('ssm').send_command(
-            InstanceIds=ec2id_list,
-            DocumentName='AWS-RunShellScript',
-            Parameters={
-                "commands":[
-                    command
-                ],
-                "executionTimeout":["60"] # timeout after 1 minute
-            },
-            Comment='fc_diskanalyzer' # to make it easier to find out commands
-        )
-    except:
-        e = sys.exc_info()
-        print("ERROR: failed to send SSM command: %s" %str(e))
-        traceback.print_exc()
-        return None
-    
-    # should be a list of command Id's and associated ec2Id
-    return output['Command']['CommandId']
-
-
-# cmd_list should be single CommandInfo
+# cmd_info should be single CommandInfo namedtuple
 def ssm_get_command_results(boto_session, cmd_info):
     output = None
     try:
         output = boto_session.client('ssm').get_command_invocation(
                         CommandId=cmd_info.cmdId,
                         InstanceId=cmd_info.ec2Id)
-        #print("ssm_get_command_results: %s" %str(output))
     except:
         e = sys.exc_info()
         print("ERROR failed to get command results %s" %str(e))
@@ -134,7 +110,6 @@ def ssm_get_command_results_all(boto_session, cmd_info_list):
             output = boto_session.client('ssm').get_command_invocation(
                             CommandId=item.cmdId,
                             InstanceId=item.ec2Id)
-            #print("ssm_get_command_results: %s" %str(output))
         except:
             e = sys.exc_info()
             print("ERROR failed to get command results %s" %str(e))
@@ -198,7 +173,7 @@ def parse_df_output(out):
     tmp = soc.split('\n') # split on new line for easier processing
     if len(tmp) < 1: # if for some reason output is empty
         return None
-    for i in range(1, len(tmp)-1): #there's a newline at end of output, skip it
+    for i in range(1, len(tmp)-1): # one blank line at end of output
         t = tmp[i].split()
         # only want volumes, not tmpfs
         if t[0].startswith("/dev/sd") or t[0].startswith("/dev/xvd"):
@@ -224,7 +199,7 @@ def parse_wmic_output(out):
     tmp = soc.split('\n')
     if len(tmp) < 1: # if for some reason output is empty
         return None
-    for i in range(1, len(tmp)-2): # two newlines at end of output
+    for i in range(1, len(tmp)-2): # two blank lines at end of output
         t = tmp[i].split()
         size = int(t[3]) # size in bytes
         used = int(t[3])-int(t[2])
@@ -251,7 +226,7 @@ def print_results_tab(df_list, j=False):
     if j == True:
         print(json.dumps(df_list, sort_keys=True, indent=4))
     else:
-        print("Ec2ID               Device      Mountpoint Timestamp   Size(GB) Used(GB) Used%")
+        print("Ec2ID               Device      Mountpoint  Size(GB)  Free(GB)  Used(GB)  Used%")
         for item in df_list:
             size = float(item['size']) / (1024*1024*1024)
             used = float(item['used']) / (1024*1024*1024)
@@ -261,17 +236,21 @@ def print_results_tab(df_list, j=False):
             sfree = "%.2f" %free
             # some formatting magic to make columns line up
             sdev = "{0}{1:{width}}".format(item['dev'], "", width=11-len(item['dev']))
-            smount = "{0}{1:{width}}".format(item['mountpoint'], "", width=10-len(item['mountpoint']))
+            smount = item['mountpoint']
+            if len(smount) > 10:
+                smount = smount[0:10] # truncate long mountpoints
+            smount = "{0}{1:{width}}".format(smount, "", width=10-len(item['mountpoint']))
             ssize = "{0:{width}}{1}".format("", ssize, width=8-len(ssize))
+            sfree = "{0:{width}}{1}".format("", sfree, width=8-len(sfree))
             sused = "{0:{width}}{1}".format("", sused, width=8-len(sused))
             spct = "{0:{width}}{1}".format("", item['used_pct'], width=6-len(item['used_pct']))
 
-            print("%s %s %s %s %s %s %s" \
+            print("%s %s %s %s  %s  %s  %s" \
                   %(item['ec2Id'],
                     sdev,
                     smount,
-                    str(item['timestamp']),
                     ssize,
+                    sfree,
                     sused,
                     spct))
 
@@ -405,7 +384,7 @@ if __name__ == "__main__":
                     print("\nError: invalid profile: %s" %p)
                     os._exit(1)
 
-            # get secret/access keys
+            # get access/secret keys
             a = pFile.readline().strip().split(" ")[2]
             s = pFile.readline().strip().split(" ")[2]
 
