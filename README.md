@@ -13,7 +13,6 @@ $ AWS_DEFAULT_PROFILE=default python diskanalyzer.py
 For more information about options:
 ```
 $ python diskanalyzer.py --help
-
 diskanalyzer.py <options>
 	Options are:
 

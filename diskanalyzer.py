@@ -205,8 +205,8 @@ def parse_df_output(out):
             a = {"ec2Id": out['InstanceId'],
                  # the following nightmare converts the output's
                  # time string into a unix timestamp
-                 "timestamp": time.mktime(datetime.datetime.strptime(
-                             out['ExecutionEndDateTime'], FC_TIME_FMT).timetuple()),
+                 "timestamp": int(time.mktime(datetime.datetime.strptime(
+                             out['ExecutionEndDateTime'], FC_TIME_FMT).timetuple())),
                  "dev": t[0],
                  "size": int(t[1])*DF_BLOCK_SIZE, # assumes 1K blocks
                  "used": int(t[2])*DF_BLOCK_SIZE,
@@ -232,8 +232,8 @@ def parse_wmic_output(out):
         a = {"ec2Id": out['InstanceId'],
              # the following nightmare converts the output's
              # time string into a unix timestamp
-             "timestamp": time.mktime(datetime.datetime.strptime(
-                         out['ExecutionEndDateTime'], FC_TIME_FMT).timetuple()),
+             "timestamp": int(time.mktime(datetime.datetime.strptime(
+                         out['ExecutionEndDateTime'], FC_TIME_FMT).timetuple())),
              "dev": t[1],
              "size": size,
              "used": used,
@@ -244,6 +244,39 @@ def parse_wmic_output(out):
     return wmic_list
 
 
+# always print in GB to fit in 80-character-wide terminal
+# dump json raw, not human-readable.  consumer of can apply transformations
+# to json output.
+def print_results_tab(df_list, j=False):
+    if j == True:
+        print(json.dumps(df_list, sort_keys=True, indent=4))
+    else:
+        print("Ec2ID               Device      Mountpoint Timestamp   Size(GB) Used(GB) Used%")
+        for item in df_list:
+            size = float(item['size']) / (1024*1024*1024)
+            used = float(item['used']) / (1024*1024*1024)
+            free = float(item['free']) / (1024*1024*1024)
+            ssize = "%.2f" %size
+            sused = "%.2f" %used
+            sfree = "%.2f" %free
+            # some formatting magic to make columns line up
+            sdev = "{0}{1:{width}}".format(item['dev'], "", width=11-len(item['dev']))
+            smount = "{0}{1:{width}}".format(item['mountpoint'], "", width=10-len(item['mountpoint']))
+            ssize = "{0:{width}}{1}".format("", ssize, width=8-len(ssize))
+            sused = "{0:{width}}{1}".format("", sused, width=8-len(sused))
+            spct = "{0:{width}}{1}".format("", item['used_pct'], width=6-len(item['used_pct']))
+
+            print("%s %s %s %s %s %s %s" \
+                  %(item['ec2Id'],
+                    sdev,
+                    smount,
+                    str(item['timestamp']),
+                    ssize,
+                    sused,
+                    spct))
+
+
+# not currently used
 # human readable can be blank for bytes, 'k' for KB, 'm' for MB, 'g' for GB
 # dump json raw, not human-readable.  consumer of can apply transformations
 # to json output.
@@ -288,6 +321,7 @@ def print_results(df_list, human_readable='', j=False):
             print('')
 
 
+# human-readable option currently not used, so hide it from usage
 def print_usage():
      print("diskanalyzer.py <options>\n"
            "\tOptions are:\n\n"
@@ -296,7 +330,7 @@ def print_usage():
            "\t-a --accesskey <access key> - AWS access key\n"
            "\t-s --secretkey <secret key> - AWS secret key\n"
            "\t-r --regions <region1,region2,...> - A list of AWS regions.  If this option is omitted, all regions will be checked.\n"
-           "\t-h --human-readable <'k', 'm', or 'g'> display results in KB, MB, or GB.\n"
+           #"\t-h --human-readable <'k', 'm', or 'g'> display results in KB, MB, or GB.\n"
            "\t-j --json - Output in JSON format.\n\n"
            "\tOne of the following three parameters are required:\n"
            "\t\t1. Both the -a and -s options.\n"
@@ -411,6 +445,7 @@ if __name__ == "__main__":
                     cmd_info = CommandInfo(ec2Id=ec2.id, cmdId=cmdId, platform=ec2.platform)
                     cmd_info_list.append(cmd_info)
 
+            time.sleep(5) # wait for commands to finish executing
             out = []
             for cmd in cmd_info_list:
                 output = ssm_get_command_results(bs, cmd)
@@ -420,7 +455,7 @@ if __name__ == "__main__":
                     lst = parse_df_output(output)
                 for tmp in lst:
                     out.append(tmp)
-            print_results(out, h, j)
+            print_results_tab(out, j) # default to sizes in GB
 
         except:
             e = sys.exc_info()
