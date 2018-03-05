@@ -21,7 +21,6 @@ diskanalyzer.py <options>
 	-a --accesskey <access key> - AWS access key
 	-s --secretkey <secret key> - AWS secret key
 	-r --regions <region1,region2,...> - A list of AWS regions.  If this option is omitted, all regions will be checked.
-	-h --human-readable <'k', 'm', or 'g'> display results in KB, MB, or GB.
 	-j --json - Output in JSON format.
 
 	One of the following three parameters are required:
