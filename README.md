@@ -5,7 +5,7 @@ Disk Usage Analyzer
 
 For more information about the software, see the blog post:
 
-[An Open Source Tool to analyze wasted EBS capacity in your AWS environment](https://www.fittedcloud.com/blog/simple-open-source-tool-ec2-rightsizing-analysis/)
+[An Open Source Tool to analyze wasted EBS capacity in your AWS environment](https://www.fittedcloud.com/blog/open-source-tool-analyze-wasted-ebs-capacity-aws-environment/)
 
 Installation:
     1. Install Python 2.7 if not already installed.
