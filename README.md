@@ -1,5 +1,12 @@
 Disk Usage Analyzer
 
+[This utility was written by FittedCloud](https://www.fittedcloud.com)
+
+
+For more information about the software, see the blog post:
+
+[https://www.fittedcloud.com/blog/open-source-tool-analyze-wasted-ebs-capacity-aws-environment/](https://www.fittedcloud.com/blog/simple-open-source-tool-ec2-rightsizing-analysis/)
+
 Installation:
     1. Install Python 2.7 if not already installed.
     2. Install boto3, botocore, and arrow.  Use "sudo pip install boto3 botocore arrow".
